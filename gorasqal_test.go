@@ -31,11 +31,7 @@ LIMIT 2
 		t.Fatal(err)
 	}
 
-	for {
-		row, ok := <-results
-		if !ok {
-			break
-		}
+	for _, row := range results {
 		log.Print(row)
 	}
 }

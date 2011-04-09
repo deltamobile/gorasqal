@@ -189,8 +189,7 @@ func (s *Service) Execute() (err os.Error) {
 }
 
 // Perform the operation as a query and return a set of results.
-func (s *Service) Query() (results chan map[string]goraptor.Term, err os.Error) {
-	results = make(chan map[string]goraptor.Term)
+func (s *Service) Query() (results []map[string]goraptor.Term, err os.Error) {
 	s.mutex.Lock()
 
 	query_results := C.rasqal_service_execute(s.svc)
@@ -202,58 +201,63 @@ func (s *Service) Query() (results chan map[string]goraptor.Term, err os.Error) 
 		return
 	}
 
-	go func() {
-		columns := int(C.rasqal_query_results_get_bindings_count(query_results))
-		bindings := make([]string, 0, columns)
+	rows := int(C.rasqal_query_results_get_count(query_results))
+	results = make([]map[string]goraptor.Term, 0, rows)
+
+	columns := int(C.rasqal_query_results_get_bindings_count(query_results))
+	bindings := make([]string, 0, columns)
+	for i := 0; i < columns; i++ {
+		ucbinding := C.rasqal_query_results_get_binding_name(query_results, C.int(i))
+		binding := C.GoString((*C.char)(unsafe.Pointer(ucbinding)))
+		bindings = append(bindings, binding)
+	}
+
+	for {
+		if C.rasqal_query_results_finished(query_results) != 0 {
+			break
+		}
+		
+		row := make(map[string]goraptor.Term)
 		for i := 0; i < columns; i++ {
-			ucbinding := C.rasqal_query_results_get_binding_name(query_results, C.int(i))
-			binding := C.GoString((*C.char)(unsafe.Pointer(ucbinding)))
-			bindings = append(bindings, binding)
-		}
-
-		for {
-			if C.rasqal_query_results_finished(query_results) != 0 {
-				break
-			}
-
-			row := make(map[string]goraptor.Term)
-			for i := 0; i < columns; i++ {
-				rasqal_literal := C.rasqal_query_results_get_binding_value(query_results, C.int(i))
-				ucvalue := C.rasqal_literal_as_string(rasqal_literal)
-				value := C.GoString((*C.char)(unsafe.Pointer(ucvalue)))
-				term_type := C.rasqal_literal_get_rdf_term_type(rasqal_literal)
-
-				var term goraptor.Term
-				switch {
-				case term_type == C.RASQAL_LITERAL_BLANK:
-					blank := goraptor.Blank(value)
-					term = &blank
-				case term_type == C.RASQAL_LITERAL_URI:
-					uri := goraptor.Uri(value)
-					term = &uri
-				default: // literal
-					dturi := C.rasqal_literal_datatype(rasqal_literal)
-					var datatype string
-					if dturi != nil {
-						dtstr := C.raptor_uri_as_string(dturi)
-						datatype = C.GoString((*C.char)(unsafe.Pointer(dtstr)))
-					}
-					term = &goraptor.Literal{Value: value, Datatype: datatype}
+			rasqal_literal := C.rasqal_query_results_get_binding_value(query_results, C.int(i))
+			ucvalue := C.rasqal_literal_as_string(rasqal_literal)
+			value := C.GoString((*C.char)(unsafe.Pointer(ucvalue)))
+			term_type := C.rasqal_literal_get_rdf_term_type(rasqal_literal)
+			
+			var term goraptor.Term
+			switch {
+			case term_type == C.RASQAL_LITERAL_BLANK:
+				blank := goraptor.Blank(value)
+				term = &blank
+			case term_type == C.RASQAL_LITERAL_URI:
+				uri := goraptor.Uri(value)
+				term = &uri
+			default: // literal
+				dturi := C.rasqal_literal_datatype(rasqal_literal)
+				var datatype string
+				if dturi != nil {
+					dtstr := C.raptor_uri_as_string(dturi)
+					datatype = C.GoString((*C.char)(unsafe.Pointer(dtstr)))
 				}
-
-				row[bindings[i]] = term
+				var language string
+				if rasqal_literal.language != nil {
+					language = C.GoString(rasqal_literal.language)
+				}
+				term = &goraptor.Literal{Value: value, Lang: language, Datatype: datatype}
 			}
-
-			results <- row
-
-			if C.rasqal_query_results_next(query_results) != 0 {
-				break
-			}
+			
+			row[bindings[i]] = term
 		}
 
-		C.rasqal_free_query_results(query_results)
-		s.mutex.Unlock()
-		close(results)
-	}()
+		results = append(results, row)
+
+		if C.rasqal_query_results_next(query_results) != 0 {
+			break
+		}
+	}
+
+	C.rasqal_free_query_results(query_results)
+	s.mutex.Unlock()
+
 	return
 }
