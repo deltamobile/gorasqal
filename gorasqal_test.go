@@ -5,11 +5,9 @@ import (
 	"testing"
 )
 
-/*
 func TestPrint(t *testing.T) {
 	QueryPrint("SELECT DISTINCT ?s WHERE { { ?s <a> ?o } UNION { ?s <b> <c> } }")
 }
-*/
 
 func TestService(t *testing.T) {
 	w := NewWorld()
@@ -18,7 +16,6 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT * 
 WHERE { 
     ?s rdfs:comment ?o
-    FILTER ( isLiteral(?o) )
 }
 LIMIT 2
 `
