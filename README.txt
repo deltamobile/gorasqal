@@ -37,12 +37,19 @@ func (q *Query) Print()
 type Service struct {
     // contains unexported fields
 }
+The rasqal service enables queries against remote SPARQL endpoints.
+It is a one-off construct, used to execute a single query.
 
 func NewService(world *World, endpoint string, query string) *Service
 
-func (s *Service) Execute() (results chan map[string]goraptor.Term)
+func (s *Service) Execute() (err os.Error)
+Perform the operation as a query and return a set of results. This is usually
+used for SPARUL INSERT/DELETE queries.
 
 func (s *Service) Free()
+
+func (s *Service) Query() (results chan map[string]goraptor.Term, err os.Error)
+Perform the operation as a query and return a set of results.
 
 func (s *Service) SetFormat(format string)
 

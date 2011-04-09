@@ -94,6 +94,8 @@ func QueryPrint(query string) {
 	w.Free()
 }
 
+// The rasqal service enables queries against remote SPARQL endpoints.
+// It is a one-off construct, used to execute a single query.
 type Service struct {
 	mutex sync.Mutex
 	world *World
@@ -171,20 +173,36 @@ func (s *Service) SetProxy(proxy string) {
 	C.free(unsafe.Pointer(cproxy))
 }
 
-func (s *Service) Execute() (results chan map[string]goraptor.Term) {
+// Perform the operation as a query and return a set of results. This is usually
+// used for SPARUL INSERT/DELETE queries.
+func (s *Service) Execute() (err os.Error) {
+	s.mutex.Lock()
+
+	query_results := C.rasqal_service_execute(s.svc)
+	if query_results == nil {
+		// xxx when this fails, svc gets freed???
+		s.svc = nil
+		err = os.ErrorString("could not execute the query. inspect the log for details")
+	}
+	s.mutex.Unlock()
+	return
+}
+
+// Perform the operation as a query and return a set of results.
+func (s *Service) Query() (results chan map[string]goraptor.Term, err os.Error) {
 	results = make(chan map[string]goraptor.Term)
 	s.mutex.Lock()
+
+	query_results := C.rasqal_service_execute(s.svc)
+	if query_results == nil {
+		// xxx when this fails, svc gets freed???
+		s.svc = nil
+		err = os.ErrorString("could not execute the query. inspect the log for details")
+		s.mutex.Unlock()
+		return
+	}
+
 	go func() {
-		defer close(results)
-
-		query_results := C.rasqal_service_execute(s.svc)
-		if query_results == nil {
-			// xxx when this fails, svc gets freed
-			s.svc = nil
-			s.mutex.Unlock()
-			return
-		}
-
 		columns := int(C.rasqal_query_results_get_bindings_count(query_results))
 		bindings := make([]string, 0, columns)
 		for i := 0; i < columns; i++ {
@@ -192,8 +210,6 @@ func (s *Service) Execute() (results chan map[string]goraptor.Term) {
 			binding := C.GoString((*C.char)(unsafe.Pointer(ucbinding)))
 			bindings = append(bindings, binding)
 		}
-
-		log.Print(bindings)
 
 		for {
 			if C.rasqal_query_results_finished(query_results) != 0 {
@@ -237,6 +253,7 @@ func (s *Service) Execute() (results chan map[string]goraptor.Term) {
 
 		C.rasqal_free_query_results(query_results)
 		s.mutex.Unlock()
+		close(results)
 	}()
-	return results
+	return
 }

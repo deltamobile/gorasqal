@@ -26,7 +26,11 @@ LIMIT 2
 		t.Fatal("could not make service")
 	}
 
-	results := svc.Execute()
+	results, err := svc.Query()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for {
 		row, ok := <-results
 		if !ok {
