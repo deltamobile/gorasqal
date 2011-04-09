@@ -46,6 +46,10 @@ func (s *Service) Free()
 
 func (s *Service) SetFormat(format string)
 
+func (s *Service) SetProxy(proxy string)
+
+func (s *Service) SetUserAgent(user_agent string)
+
 type World struct {
     // contains unexported fields
 }

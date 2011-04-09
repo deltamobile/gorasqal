@@ -1,7 +1,8 @@
 include $(GOROOT)/src/Make.inc
 
 TARG=bitbucket.org/ww/gorasqal
-CGOFILES=doc.go gorasqal.go
+GOFILES=doc.go
+CGOFILES=gorasqal.go
 CGO_OFILES=crasqal.o
 
 include $(GOROOT)/src/Make.pkg

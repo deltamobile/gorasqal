@@ -118,7 +118,6 @@ func NewService(world *World, endpoint string, query string) *Service {
 	s.dg = C.goraptor_new_sequence()
 	s.svc = C.rasqal_new_service(world.rasqal_world, s.endpoint, cquery, s.dg)
 
-
 	if s.svc == nil {
 		C.raptor_free_uri(s.endpoint)
 		return nil
@@ -134,7 +133,9 @@ func NewService(world *World, endpoint string, query string) *Service {
 		s.Free()
 		return nil
 	}
-	
+
+	s.SetUserAgent("gorasqal hello world")
+
 	return s
 }
 
@@ -156,6 +157,18 @@ func (s *Service) SetFormat(format string) {
 	cformat := C.CString(format)
 	C.rasqal_service_set_format(s.svc, cformat)
 	C.free(unsafe.Pointer(cformat))
+}
+
+func (s *Service) SetUserAgent(user_agent string) {
+	cua := C.CString(user_agent)
+	C.raptor_www_set_user_agent(s.www, cua)
+	C.free(unsafe.Pointer(cua))
+}
+
+func (s *Service) SetProxy(proxy string) {
+	cproxy := C.CString(proxy)
+	C.raptor_www_set_proxy(s.www, cproxy)
+	C.free(unsafe.Pointer(cproxy))
 }
 
 func (s *Service) Execute() (results chan map[string]goraptor.Term) {
