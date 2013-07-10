@@ -8,6 +8,7 @@ package gorasqal
 import "C"
 
 import (
+	"errors"
 	"github.com/deltamobile/goraptor"
 	"log"
 	"os"
@@ -17,7 +18,7 @@ import (
 
 type World struct {
 	rasqal_world *C.rasqal_world
-	err os.Error
+	err          error
 }
 
 func NewWorld() (w *World) {
@@ -39,7 +40,7 @@ func GoRasqal_log_handler(user_data unsafe.Pointer, messagep unsafe.Pointer) {
 	world := (*World)(user_data)
 	text := C.GoString(message.text)
 	if C.int(message.level) > C.RAPTOR_LOG_LEVEL_INFO {
-		world.err = os.ErrorString(text)
+		world.err = errors.New(text)
 	}
 	log.Print(text)
 }
@@ -65,7 +66,7 @@ func (q *Query) Free() {
 	C.rasqal_free_query(q.query)
 }
 
-func (q *Query) Prepare(query string) (err os.Error) {
+func (q *Query) Prepare(query string) (err error) {
 	cq := C.CString(query)
 	result := C.rasqal_query_prepare(q.query, (*C.uchar)(unsafe.Pointer(cq)), (*C.raptor_uri)(nil))
 	C.free(unsafe.Pointer(cq))
@@ -175,28 +176,28 @@ func (s *Service) SetProxy(proxy string) {
 
 // Perform the operation as a query and return a set of results. This is usually
 // used for SPARUL INSERT/DELETE queries.
-func (s *Service) Execute() (err os.Error) {
+func (s *Service) Execute() (err error) {
 	s.mutex.Lock()
 
 	query_results := C.rasqal_service_execute(s.svc)
 	if query_results == nil {
 		// xxx when this fails, svc gets freed???
 		s.svc = nil
-		err = os.ErrorString("could not execute the query. inspect the log for details")
+		err = errors.New("could not execute the query. inspect the log for details")
 	}
 	s.mutex.Unlock()
 	return
 }
 
 // Perform the operation as a query and return a set of results.
-func (s *Service) Query() (results []map[string]goraptor.Term, err os.Error) {
+func (s *Service) Query() (results []map[string]goraptor.Term, err error) {
 	s.mutex.Lock()
 
 	query_results := C.rasqal_service_execute(s.svc)
 	if query_results == nil {
 		// xxx when this fails, svc gets freed???
 		s.svc = nil
-		err = os.ErrorString("could not execute the query. inspect the log for details")
+		err = errors.New("could not execute the query. inspect the log for details")
 		s.mutex.Unlock()
 		return
 	}
