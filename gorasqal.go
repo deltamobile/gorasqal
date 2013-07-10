@@ -8,7 +8,7 @@ package gorasqal
 import "C"
 
 import (
-	"bitbucket.org/ww/goraptor"
+	"github.com/deltamobile/goraptor"
 	"log"
 	"os"
 	"sync"
