@@ -49,7 +49,6 @@ func (w *World) Free() {
 	C.rasqal_free_world(w.rasqal_world)
 }
 
-
 type Query struct {
 	world *World
 	query *C.rasqal_query
@@ -98,12 +97,12 @@ func QueryPrint(query string) {
 // The rasqal service enables queries against remote SPARQL endpoints.
 // It is a one-off construct, used to execute a single query.
 type Service struct {
-	mutex sync.Mutex
-	world *World
+	mutex    sync.Mutex
+	world    *World
 	endpoint *C.raptor_uri
-	svc *C.rasqal_service
-	dg *C.raptor_sequence
-	www *C.raptor_www
+	svc      *C.rasqal_service
+	dg       *C.raptor_sequence
+	www      *C.raptor_www
 }
 
 func NewService(world *World, endpoint string, query string) *Service {
@@ -217,14 +216,14 @@ func (s *Service) Query() (results []map[string]goraptor.Term, err error) {
 		if C.rasqal_query_results_finished(query_results) != 0 {
 			break
 		}
-		
+
 		row := make(map[string]goraptor.Term)
 		for i := 0; i < columns; i++ {
 			rasqal_literal := C.rasqal_query_results_get_binding_value(query_results, C.int(i))
 			ucvalue := C.rasqal_literal_as_string(rasqal_literal)
 			value := C.GoString((*C.char)(unsafe.Pointer(ucvalue)))
 			term_type := C.rasqal_literal_get_rdf_term_type(rasqal_literal)
-			
+
 			var term goraptor.Term
 			switch {
 			case term_type == C.RASQAL_LITERAL_BLANK:
@@ -246,7 +245,7 @@ func (s *Service) Query() (results []map[string]goraptor.Term, err error) {
 				}
 				term = &goraptor.Literal{Value: value, Lang: language, Datatype: datatype}
 			}
-			
+
 			row[bindings[i]] = term
 		}
 
