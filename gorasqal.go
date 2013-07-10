@@ -1,7 +1,7 @@
 package gorasqal
 
-// #cgo CFLAGS: -I/usr/local/include/rasqal -I/usr/local/include/raptor2
-// #cgo LDFLAGS: -L/usr/local/lib -lrasqal -lraptor2
+// #cgo CFLAGS: -I/usr/include/rasqal -I/usr/include/raptor2
+// #cgo LDFLAGS: -lrasqal -lraptor2
 // #include <stdlib.h>
 // #include <rasqal.h>
 // #include "crasqal.h"
