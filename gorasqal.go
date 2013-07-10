@@ -119,7 +119,7 @@ func NewService(world *World, endpoint string, query string) *Service {
 	defer C.free(unsafe.Pointer(cquery))
 
 	s.dg = C.goraptor_new_sequence()
-	s.svc = C.rasqal_new_service(world.rasqal_world, s.endpoint, cquery, s.dg)
+	s.svc = C.rasqal_new_service(world.rasqal_world, s.endpoint, (*C.uchar)(unsafe.Pointer(cquery)), s.dg)
 
 	if s.svc == nil {
 		C.raptor_free_uri(s.endpoint)
