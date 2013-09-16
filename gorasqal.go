@@ -102,21 +102,26 @@ type Service struct {
 	endpoint     *C.raptor_uri
 	endpoint_str string
 	orig_query   string
+	actual_query string
 	svc          *C.rasqal_service
 	dg           *C.raptor_sequence
 	www          *C.raptor_www
+	format		 string
+	user_agent	 string
+	proxy		 string
+	query_ready	 bool
 }
 
 func NewService(world *World, endpoint string, query string) *Service {
 	s := &Service{world: world}
 	s.endpoint_str = endpoint
 	s.orig_query = query
-	if s.prepQuery() != nil {
-		return nil
-	}
 	return s
 }
+
+/* Set up C rasqal object based on current values. */
 func (s *Service) prepQuery() error {
+	s.free()
 	raptor_world := C.rasqal_world_get_raptor(s.world.rasqal_world)
 
 	cep := (*C.uchar)(unsafe.Pointer(C.CString(s.endpoint_str)))
@@ -145,7 +150,25 @@ func (s *Service) prepQuery() error {
 		return errors.New("Failed to set www.")
 	}
 
-	s.SetUserAgent("gorasqal hello world")
+	if s.format != "" {
+		cformat := C.CString(s.format)
+		C.rasqal_service_set_format(s.svc, cformat)
+		C.free(unsafe.Pointer(cformat))
+	}
+
+	if s.user_agent == "" {
+		s.SetUserAgent("gorasqal hello world")
+	}
+	cua := C.CString(s.user_agent)
+	C.raptor_www_set_user_agent(s.www, cua)
+	C.free(unsafe.Pointer(cua))
+
+	if s.proxy != "" {
+		cproxy := C.CString(s.proxy)
+		C.raptor_www_set_proxy(s.www, cproxy)
+		C.free(unsafe.Pointer(cproxy))
+	}
+	s.query_ready = true
 
 	return nil
 }
@@ -159,12 +182,13 @@ func (s *Service) Free() {
 func (s *Service) free() {
 	if s.svc != nil {
 		C.rasqal_free_service(s.svc)
-		if s.endpoint != nil {
-			s.endpoint = nil /* freed by rasqal_free_service */
-		}
-		if s.dg != nil {
-			s.dg = nil /* freed by rasqal_free_service */
-		}
+		s.svc = nil
+	}
+	if s.endpoint != nil {
+		s.endpoint = nil /* freed by rasqal_free_service */
+	}
+	if s.dg != nil {
+		s.dg = nil /* freed by rasqal_free_service */
 	}
 	/*
 		The rasqal_free_service does not free the www object, but
@@ -174,24 +198,22 @@ func (s *Service) free() {
 			C.raptor_free_www(s.www)
 		}
 	*/
+	s.query_ready = false
 }
 
 func (s *Service) SetFormat(format string) {
-	cformat := C.CString(format)
-	C.rasqal_service_set_format(s.svc, cformat)
-	C.free(unsafe.Pointer(cformat))
+	s.format = format
+	s.query_ready = false
 }
 
 func (s *Service) SetUserAgent(user_agent string) {
-	cua := C.CString(user_agent)
-	C.raptor_www_set_user_agent(s.www, cua)
-	C.free(unsafe.Pointer(cua))
+	s.user_agent = user_agent
+	s.query_ready = false
 }
 
 func (s *Service) SetProxy(proxy string) {
-	cproxy := C.CString(proxy)
-	C.raptor_www_set_proxy(s.www, cproxy)
-	C.free(unsafe.Pointer(cproxy))
+	s.proxy = proxy
+	s.query_ready = false
 }
 
 // Perform the operation as a query and return a set of results. This is usually
@@ -199,6 +221,10 @@ func (s *Service) SetProxy(proxy string) {
 func (s *Service) Execute() (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	if ! s.query_ready {
+		s.prepQuery()
+	}
 
 	query_results := C.rasqal_service_execute(s.svc)
 	if query_results == nil {
@@ -213,6 +239,10 @@ func (s *Service) Execute() (err error) {
 func (s *Service) Query() (results []map[string]goraptor.Term, err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	if ! s.query_ready {
+		s.prepQuery()
+	}
 
 	query_results := C.rasqal_service_execute(s.svc)
 	if query_results == nil {
