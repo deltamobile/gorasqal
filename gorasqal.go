@@ -189,6 +189,7 @@ func (s *Service) SetProxy(proxy string) {
 // used for SPARUL INSERT/DELETE queries.
 func (s *Service) Execute() (err error) {
 	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	query_results := C.rasqal_service_execute(s.svc)
 	if query_results == nil {
@@ -196,20 +197,19 @@ func (s *Service) Execute() (err error) {
 		s.svc = nil
 		err = errors.New("could not execute the query. inspect the log for details")
 	}
-	s.mutex.Unlock()
 	return
 }
 
 // Perform the operation as a query and return a set of results.
 func (s *Service) Query() (results []map[string]goraptor.Term, err error) {
 	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	query_results := C.rasqal_service_execute(s.svc)
 	if query_results == nil {
 		// xxx when this fails, svc gets freed???
 		s.svc = nil
 		err = errors.New("could not execute the query. inspect the log for details")
-		s.mutex.Unlock()
 		return
 	}
 
@@ -269,7 +269,5 @@ func (s *Service) Query() (results []map[string]goraptor.Term, err error) {
 	}
 
 	C.rasqal_free_query_results(query_results)
-	s.mutex.Unlock()
-
 	return
 }
