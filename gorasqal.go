@@ -143,16 +143,28 @@ func NewService(world *World, endpoint string, query string) *Service {
 
 func (s *Service) Free() {
 	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.free()
+}
+
+func (s *Service) free() {
 	if s.svc != nil {
 		C.rasqal_free_service(s.svc)
+		if s.endpoint != nil {
+			s.endpoint = nil /* freed by rasqal_free_service */
+		}
+		if s.dg != nil {
+			s.dg = nil /* freed by rasqal_free_service */
+		}
 	}
-	if s.endpoint != nil {
-		C.raptor_free_uri(s.endpoint)
+	/*
+	The rasqal_free_service does not free the www object, but
+	trying to do so here causes a crash.  Not sure why.
+
+	if s.www != nil {
+		C.raptor_free_www(s.www)
 	}
-	if s.dg != nil {
-		C.raptor_free_sequence(s.dg)
-	}
-	s.mutex.Unlock()
+	*/
 }
 
 func (s *Service) SetFormat(format string) {
