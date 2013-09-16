@@ -97,48 +97,57 @@ func QueryPrint(query string) {
 // The rasqal service enables queries against remote SPARQL endpoints.
 // It is a one-off construct, used to execute a single query.
 type Service struct {
-	mutex    sync.Mutex
-	world    *World
-	endpoint *C.raptor_uri
-	svc      *C.rasqal_service
-	dg       *C.raptor_sequence
-	www      *C.raptor_www
+	mutex        sync.Mutex
+	world        *World
+	endpoint     *C.raptor_uri
+	endpoint_str string
+	orig_query   string
+	svc          *C.rasqal_service
+	dg           *C.raptor_sequence
+	www          *C.raptor_www
 }
 
 func NewService(world *World, endpoint string, query string) *Service {
 	s := &Service{world: world}
+	s.endpoint_str = endpoint
+	s.orig_query = query
+	if s.prepQuery() != nil {
+		return nil
+	}
+	return s
+}
+func (s *Service) prepQuery() error {
+	raptor_world := C.rasqal_world_get_raptor(s.world.rasqal_world)
 
-	raptor_world := C.rasqal_world_get_raptor(world.rasqal_world)
-
-	cep := (*C.uchar)(unsafe.Pointer(C.CString(endpoint)))
+	cep := (*C.uchar)(unsafe.Pointer(C.CString(s.endpoint_str)))
 	s.endpoint = C.raptor_new_uri(raptor_world, cep)
 	C.free(unsafe.Pointer(cep))
 
-	cquery := (*C.uchar)(unsafe.Pointer(C.CString(query)))
+	cquery := (*C.uchar)(unsafe.Pointer(C.CString(s.orig_query)))
 	defer C.free(unsafe.Pointer(cquery))
 
 	s.dg = C.goraptor_new_sequence()
-	s.svc = C.rasqal_new_service(world.rasqal_world, s.endpoint, cquery, s.dg)
+	s.svc = C.rasqal_new_service(s.world.rasqal_world, s.endpoint, cquery, s.dg)
 
 	if s.svc == nil {
 		C.raptor_free_uri(s.endpoint)
-		return nil
+		return errors.New("Failed to create service.")
 	}
 
 	s.www = C.raptor_new_www(raptor_world)
 	if s.www == nil {
-		s.Free()
-		return nil
+		s.free()
+		return errors.New("Failed to create www.")
 	}
 
 	if C.rasqal_service_set_www(s.svc, s.www) != 0 {
-		s.Free()
-		return nil
+		s.free()
+		return errors.New("Failed to set www.")
 	}
 
 	s.SetUserAgent("gorasqal hello world")
 
-	return s
+	return nil
 }
 
 func (s *Service) Free() {
@@ -158,12 +167,12 @@ func (s *Service) free() {
 		}
 	}
 	/*
-	The rasqal_free_service does not free the www object, but
-	trying to do so here causes a crash.  Not sure why.
+		The rasqal_free_service does not free the www object, but
+		trying to do so here causes a crash.  Not sure why.
 
-	if s.www != nil {
-		C.raptor_free_www(s.www)
-	}
+		if s.www != nil {
+			C.raptor_free_www(s.www)
+		}
 	*/
 }
 
