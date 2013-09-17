@@ -8,11 +8,13 @@ package gorasqal
 import "C"
 
 import (
+	"bytes"
 	"errors"
 	"github.com/deltamobile/goraptor"
 	"log"
 	"os"
 	"sync"
+	"text/template"
 	"unsafe"
 )
 
@@ -119,8 +121,35 @@ func NewService(world *World, endpoint string, query string) *Service {
 	return s
 }
 
+func (s *Service) generateQueryFromTemplate(data interface{}) error {
+	buf := new(bytes.Buffer)
+	tmpl := template.Must(template.New("query").Parse(s.orig_query))
+	err := tmpl.Execute(buf, data)
+	if err != nil {
+		return err
+	}
+	s.actual_query = buf.String()
+	return nil
+}
+
+
 /* Set up C rasqal object based on current values. */
-func (s *Service) prepQuery() error {
+func (s *Service) prepQuery(data ... interface{}) (err error) {
+
+	if len(data) == 1 {
+		s.query_ready = false
+		err = s.generateQueryFromTemplate(data[0])
+		if err != nil {
+			log.Println("Generation of query from template failed. ", err)
+			return
+		}
+	} else if len(data) == 0 && s.actual_query == "" {
+		s.query_ready = false
+		s.actual_query = s.orig_query
+	} else if s.query_ready {
+		return nil
+	}
+
 	s.free()
 	raptor_world := C.rasqal_world_get_raptor(s.world.rasqal_world)
 
@@ -128,7 +157,7 @@ func (s *Service) prepQuery() error {
 	s.endpoint = C.raptor_new_uri(raptor_world, cep)
 	C.free(unsafe.Pointer(cep))
 
-	cquery := (*C.uchar)(unsafe.Pointer(C.CString(s.orig_query)))
+	cquery := (*C.uchar)(unsafe.Pointer(C.CString(s.actual_query)))
 	defer C.free(unsafe.Pointer(cquery))
 
 	s.dg = C.goraptor_new_sequence()
@@ -185,10 +214,10 @@ func (s *Service) free() {
 		s.svc = nil
 	}
 	if s.endpoint != nil {
-		s.endpoint = nil /* freed by rasqal_free_service */
+		s.endpoint = nil /* C object freed by rasqal_free_service */
 	}
 	if s.dg != nil {
-		s.dg = nil /* freed by rasqal_free_service */
+		s.dg = nil /* C object freed by rasqal_free_service */
 	}
 	/*
 		The rasqal_free_service does not free the www object, but
@@ -197,7 +226,9 @@ func (s *Service) free() {
 		if s.www != nil {
 			C.raptor_free_www(s.www)
 		}
+
 	*/
+	s.www = nil /* Questions: Is it OK to re-use the www object? */
 	s.query_ready = false
 }
 
@@ -218,12 +249,19 @@ func (s *Service) SetProxy(proxy string) {
 
 // Perform the operation as a query and return a set of results. This is usually
 // used for SPARUL INSERT/DELETE queries.
-func (s *Service) Execute() (err error) {
+func (s *Service) Execute(data ... interface {}) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	if len(data) > 0 {
+		s.query_ready = false
+	}
 	if ! s.query_ready {
-		s.prepQuery()
+		err = s.prepQuery(data...)
+		if err != nil {
+			log.Println("Could not prepare query: ", err)
+			return
+		}
 	}
 
 	query_results := C.rasqal_service_execute(s.svc)
@@ -236,18 +274,25 @@ func (s *Service) Execute() (err error) {
 }
 
 // Perform the operation as a query and return a set of results.
-func (s *Service) Query() (results []map[string]goraptor.Term, err error) {
+func (s *Service) Query(data ... interface {}) (results []map[string]goraptor.Term, err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	if len(data) > 0 {
+		s.query_ready = false
+	}
 	if ! s.query_ready {
-		s.prepQuery()
+		err = s.prepQuery(data...)
+		if err != nil {
+			log.Println("Could not prepare query.")
+			return
+		}
 	}
 
 	query_results := C.rasqal_service_execute(s.svc)
 	if query_results == nil {
 		// xxx when this fails, svc gets freed???
-		s.svc = nil
+		s.free()
 		err = errors.New("could not execute the query. inspect the log for details")
 		return
 	}
