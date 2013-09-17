@@ -38,7 +38,7 @@ LIMIT 2
 	log.Println("TestService basic finished.\n")
 }
 
-type rdfVar  struct {
+type rdfVar struct {
 	Predicate string
 }
 
@@ -53,7 +53,7 @@ WHERE {
 }
 LIMIT 2
 `
-	rv := []rdfVar{ rdfVar{"rdfs:label"}, rdfVar{"rdfs:comment"}, rdfVar{"rdfs:range"}}
+	rv := []rdfVar{rdfVar{"rdfs:label"}, rdfVar{"rdfs:comment"}, rdfVar{"rdfs:range"}}
 	svc := NewService(w, "http://dbpedia.org/sparql", query)
 	defer svc.Free()
 

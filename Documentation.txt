@@ -47,14 +47,17 @@ type Service struct {
 func NewService(world *World, endpoint string, query string) *Service
 
 
-func (s *Service) Execute() (err error)
+func (s *Service) Execute(data ...interface{}) (err error)
     Perform the operation as a query and return a set of results. This is
-    usually used for SPARUL INSERT/DELETE queries.
+    usually used for SPARUL INSERT/DELETE queries. If the Service was
+    created as using a template, data contains the fields to be filled in.
 
 func (s *Service) Free()
 
-func (s *Service) Query() (results []map[string]goraptor.Term, err error)
-    Perform the operation as a query and return a set of results.
+func (s *Service) Query(data ...interface{}) (results []map[string]goraptor.Term, err error)
+    Perform the operation as a query and return a set of results. If the
+    Service was created as using a template, data contains the fields to be
+    filled in.
 
 func (s *Service) SetFormat(format string)
 

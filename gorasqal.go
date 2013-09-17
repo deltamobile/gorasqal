@@ -108,10 +108,10 @@ type Service struct {
 	svc          *C.rasqal_service
 	dg           *C.raptor_sequence
 	www          *C.raptor_www
-	format		 string
-	user_agent	 string
-	proxy		 string
-	query_ready	 bool
+	format       string
+	user_agent   string
+	proxy        string
+	query_ready  bool
 }
 
 func NewService(world *World, endpoint string, query string) *Service {
@@ -132,9 +132,8 @@ func (s *Service) generateQueryFromTemplate(data interface{}) error {
 	return nil
 }
 
-
 /* Set up C rasqal object based on current values. */
-func (s *Service) prepQuery(data ... interface{}) (err error) {
+func (s *Service) prepQuery(data ...interface{}) (err error) {
 
 	if len(data) == 1 {
 		s.query_ready = false
@@ -249,14 +248,16 @@ func (s *Service) SetProxy(proxy string) {
 
 // Perform the operation as a query and return a set of results. This is usually
 // used for SPARUL INSERT/DELETE queries.
-func (s *Service) Execute(data ... interface {}) (err error) {
+// If the Service was created as using a template, data contains the
+// fields to be filled in.
+func (s *Service) Execute(data ...interface{}) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	if len(data) > 0 {
 		s.query_ready = false
 	}
-	if ! s.query_ready {
+	if !s.query_ready {
 		err = s.prepQuery(data...)
 		if err != nil {
 			log.Println("Could not prepare query: ", err)
@@ -274,14 +275,16 @@ func (s *Service) Execute(data ... interface {}) (err error) {
 }
 
 // Perform the operation as a query and return a set of results.
-func (s *Service) Query(data ... interface {}) (results []map[string]goraptor.Term, err error) {
+// If the Service was created as using a template, data contains the
+// fields to be filled in.
+func (s *Service) Query(data ...interface{}) (results []map[string]goraptor.Term, err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	if len(data) > 0 {
 		s.query_ready = false
 	}
-	if ! s.query_ready {
+	if !s.query_ready {
 		err = s.prepQuery(data...)
 		if err != nil {
 			log.Println("Could not prepare query.")
