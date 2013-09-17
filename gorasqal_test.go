@@ -10,11 +10,12 @@ func TestPrint(t *testing.T) {
 }
 
 func TestService(t *testing.T) {
+	log.Println("TestService basic started.")
 	w := NewWorld()
 	query := `
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT * 
-WHERE { 
+SELECT *
+WHERE {
     ?s rdfs:comment ?o
 }
 LIMIT 2
@@ -34,4 +35,42 @@ LIMIT 2
 	for _, row := range results {
 		log.Print(row)
 	}
+	log.Println("TestService basic finished.\n")
+}
+
+type rdfVar  struct {
+	Predicate string
+}
+
+func TestServiceTemplate(t *testing.T) {
+	log.Println("TestService template started.")
+	w := NewWorld()
+	query := `
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT *
+WHERE {
+    ?s {{.Predicate}} ?o
+}
+LIMIT 2
+`
+	rv := []rdfVar{ rdfVar{"rdfs:label"}, rdfVar{"rdfs:comment"}, rdfVar{"rdfs:range"}}
+	svc := NewService(w, "http://dbpedia.org/sparql", query)
+	defer svc.Free()
+
+	if svc == nil {
+		t.Fatal("could not make service")
+	}
+
+	for i := 0; i < 3; i++ {
+
+		results, err := svc.Query(rv[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, row := range results {
+			log.Print(row)
+		}
+	}
+	log.Println("TestService template finished.\n")
 }
